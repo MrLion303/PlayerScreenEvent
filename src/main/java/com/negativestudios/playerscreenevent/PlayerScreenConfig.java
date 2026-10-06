@@ -63,7 +63,7 @@ public final class PlayerScreenConfig {
 
         // El campo de configuracion acepta solamente el nombre del archivo.
         // Evita que una configuracion accidental salga de la carpeta del mod.
-        if (filename.contains("/") || filename.contains("\") || filename.equals(".") || filename.equals("..")) {
+        if (filename.contains("/") || filename.contains("\\") || filename.equals(".") || filename.equals("..")) {
             filename = "screen.png";
         }
 
