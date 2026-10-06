@@ -9,9 +9,6 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.lwjgl.glfw.GLFW;
 
@@ -23,6 +20,7 @@ import java.io.IOException;
 @Mod.EventBusSubscriber(modid = PlayerScreenEvent.MOD_ID, value = Dist.CLIENT)
 public final class PlayerScreenOverlay {
     private static final long FADE_MS = 500L;
+
     private static boolean active;
     private static boolean fading;
     private static long fadeStart;
@@ -31,6 +29,7 @@ public final class PlayerScreenOverlay {
     private static int playerCount;
     private static int maxPlayers;
     private static boolean canOpenChat;
+
     private static DynamicTexture dynamicTexture;
     private static ResourceLocation textureLocation;
     private static int textureWidth;
@@ -57,12 +56,20 @@ public final class PlayerScreenOverlay {
             fading = false;
             fadeStart = 0L;
 
-            if (!(minecraft.screen instanceof WaitingScreen)) {
+            if (!(minecraft.screen instanceof WaitingScreen) &&
+                    !(minecraft.screen instanceof WaitingChatScreen)) {
                 minecraft.setScreen(new WaitingScreen());
             }
-        } else if (active) {
+            return;
+        }
+
+        if (active) {
             fading = true;
             fadeStart = System.currentTimeMillis();
+
+            if (minecraft.screen instanceof WaitingChatScreen) {
+                minecraft.setScreen(new WaitingScreen());
+            }
         }
     }
 
@@ -98,7 +105,7 @@ public final class PlayerScreenOverlay {
             textureWidth = image.getWidth();
             textureHeight = image.getHeight();
         } catch (IOException ignored) {
-            // El servidor ya valido la imagen; si algo falla, se conserva el fondo anterior.
+            // Si una imagen no se puede decodificar, se conserva la anterior.
         }
     }
 
@@ -106,8 +113,9 @@ public final class PlayerScreenOverlay {
         active = false;
         fading = false;
         fadeStart = 0L;
+
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.screen instanceof WaitingScreen) {
+        if (minecraft.screen instanceof WaitingScreen || minecraft.screen instanceof WaitingChatScreen) {
             minecraft.setScreen(null);
         }
     }
@@ -125,7 +133,7 @@ public final class PlayerScreenOverlay {
         return 1.0f - progress;
     }
 
-    public static final class WaitingScreen extends Screen {
+    public static class WaitingScreen extends Screen {
         public WaitingScreen() {
             super(Component.literal("PlayerScreenEvent"));
         }
@@ -141,11 +149,6 @@ public final class PlayerScreenOverlay {
         }
 
         @Override
-        protected void init() {
-            super.init();
-        }
-
-        @Override
         public void render(GuiGraphics gui, int mouseX, int mouseY, float partialTick) {
             float alpha = getAlpha();
             if (alpha <= 0.0f) {
@@ -153,7 +156,6 @@ public final class PlayerScreenOverlay {
             }
 
             int alphaByte = Math.max(0, Math.min(255, (int) (alpha * 255.0f)));
-            int white = (alphaByte << 24) | 0x00FFFFFF;
 
             RenderSystem.enableBlend();
             RenderSystem.defaultBlendFunc();
@@ -176,25 +178,21 @@ public final class PlayerScreenOverlay {
                             (float) u, 0.0f, width, height, textureWidth, textureHeight);
                 }
             } else {
-                gui.fill(0, 0, width, height, white);
+                gui.fill(0, 0, width, height, (alphaByte << 24) | 0x00FFFFFF);
             }
 
             int titleY = (int) (height * 0.47f);
             int countY = (int) (height * 0.565f);
             int joinedY = (int) (height * 0.625f);
 
-            drawCentered(gui, title, titleY, 1.0f, alphaByte);
-            drawCentered(gui, playerCount + "/" + maxPlayers, countY, 1.0f, alphaByte);
+            drawCentered(gui, title, titleY, 1.0f, alphaByte, 0xFFFFFFFF);
+            drawCentered(gui, playerCount + "/" + maxPlayers, countY, 1.0f, alphaByte, 0xFFFFFFFF);
 
             if (!joinedPlayer.isEmpty()) {
                 drawCentered(gui, joinedPlayer + " se ha unido.", joinedY, 0.72f, alphaByte, 0xFFFF5555);
             }
 
             RenderSystem.disableBlend();
-        }
-
-        private void drawCentered(GuiGraphics gui, String text, int y, float scale, int alpha) {
-            drawCentered(gui, text, y, scale, alpha, 0xFFFFFFFF);
         }
 
         private void drawCentered(GuiGraphics gui, String text, int y, float scale, int alpha, int color) {
@@ -212,12 +210,12 @@ public final class PlayerScreenOverlay {
         @Override
         public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
             if (canOpenChat && keyCode == GLFW.GLFW_KEY_T) {
-                minecraft.setScreen(new ChatScreen(""));
+                minecraft.setScreen(new WaitingChatScreen(""));
                 return true;
             }
 
             if (canOpenChat && keyCode == GLFW.GLFW_KEY_SLASH) {
-                minecraft.setScreen(new ChatScreen("/"));
+                minecraft.setScreen(new WaitingChatScreen("/"));
                 return true;
             }
 
@@ -252,6 +250,21 @@ public final class PlayerScreenOverlay {
         @Override
         public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
             return true;
+        }
+    }
+
+    public static final class WaitingChatScreen extends ChatScreen {
+        public WaitingChatScreen(String initial) {
+            super(initial);
+        }
+
+        @Override
+        public void onClose() {
+            if (active && !fading) {
+                minecraft.setScreen(new WaitingScreen());
+            } else {
+                minecraft.setScreen(null);
+            }
         }
     }
 }
