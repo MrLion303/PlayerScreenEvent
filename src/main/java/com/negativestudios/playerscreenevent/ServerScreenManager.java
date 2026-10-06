@@ -79,7 +79,10 @@ public final class ServerScreenManager {
         }
 
         lastJoined = player.getGameProfile().getName();
-        broadcast(server, false, lastJoined);
+        send(player, true, lastJoined);
+        for (ServerPlayer other : server.getPlayerList().getPlayers()) {
+            if (other != player) send(other, false, lastJoined);
+        }
     }
 
     @SubscribeEvent
@@ -146,21 +149,7 @@ public final class ServerScreenManager {
                 throw new IOException("El archivo no es una imagen compatible.");
             }
 
-            int width = source.getWidth();
-            int height = source.getHeight();
-
-            if (width < 1280 || height < 720 || width * 9L != height * 16L) {
-                throw new IllegalArgumentException(
-                        "La imagen debe ser 16:9 y tener como minimo 1280x720. Recibida: "
-                                + width + "x" + height
-                );
-            }
-
             BufferedImage output = source;
-            if (width > 1920 || height > 1080) {
-                output = new BufferedImage(1920, 1080, BufferedImage.TYPE_INT_RGB);
-                output.getGraphics().drawImage(source, 0, 0, 1920, 1080, null);
-            }
 
             byte[] png = encodePng(output);
             if (png.length <= 1_900_000) {
