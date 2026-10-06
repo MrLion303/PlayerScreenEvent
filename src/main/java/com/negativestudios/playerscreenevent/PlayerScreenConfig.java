@@ -1,5 +1,8 @@
 package com.negativestudios.playerscreenevent;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.fml.ModLoadingContext;
@@ -13,11 +16,14 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.io.Reader;
+import java.io.Writer;
 import org.slf4j.Logger;
 
 public final class PlayerScreenConfig {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static ForgeConfigSpec SPEC;
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     public static ForgeConfigSpec.ConfigValue<String> TITLE;
     public static ForgeConfigSpec.IntValue MAX_PLAYERS;
@@ -27,6 +33,7 @@ public final class PlayerScreenConfig {
 
     public static void register() {
         createConfigFolder();
+        JsonObject json = loadJsonConfig();
 
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
 
@@ -34,15 +41,15 @@ public final class PlayerScreenConfig {
 
         TITLE = builder
                 .comment("Texto grande que aparece en el centro de la pantalla.")
-                .define("texto", "Esperando jugadores...");
+                .define("texto", json.has("texto") ? json.get("texto").getAsString() : "Esperando jugadores...");
 
         MAX_PLAYERS = builder
                 .comment("Cantidad maxima mostrada. Usa -1 para usar el maximo real del servidor.")
-                .defineInRange("jugadores_maximos", -1, -1, 1000000);
+                .defineInRange("jugadores_maximos", json.has("jugadores_maximos") ? json.get("jugadores_maximos").getAsInt() : -1, -1, 1000000);
 
         IMAGE_PATH = builder
                 .comment("Nombre del archivo de imagen dentro de config/playerscreenevent/. No escribas la ruta.")
-                .define("imagen", "screen.png");
+                .define("imagen", json.has("imagen") ? json.get("imagen").getAsString() : "screen.png");
 
         builder.pop();
 
@@ -76,11 +83,34 @@ public final class PlayerScreenConfig {
         try {
             Files.createDirectories(directory);
             createDefaultImage(directory.resolve("screen.png"));
+            createDefaultJson(directory.resolve("config.json"));
         } catch (IOException exception) {
             LOGGER.error("No se pudo crear la carpeta de configuracion de PlayerScreenEvent.", exception);
         }
     }
 
+    private static JsonObject loadJsonConfig() {
+        Path path = getImageDirectory().resolve("config.json");
+        if (!Files.exists(path)) return new JsonObject();
+        try (Reader reader = Files.newBufferedReader(path)) {
+            JsonObject object = GSON.fromJson(reader, JsonObject.class);
+            return object == null ? new JsonObject() : object;
+        } catch (Exception exception) {
+            LOGGER.error("No se pudo leer config.json de PlayerScreenEvent.", exception);
+            return new JsonObject();
+        }
+    }
+
+    private static void createDefaultJson(Path path) throws IOException {
+        if (Files.exists(path)) return;
+        JsonObject object = new JsonObject();
+        object.addProperty("texto", "Esperando jugadores...");
+        object.addProperty("jugadores_maximos", -1);
+        object.addProperty("imagen", "screen.png");
+        try (Writer writer = Files.newBufferedWriter(path)) {
+            GSON.toJson(object, writer);
+        }
+    }
     private static void createDefaultImage(Path path) throws IOException {
         if (Files.exists(path)) {
             return;
