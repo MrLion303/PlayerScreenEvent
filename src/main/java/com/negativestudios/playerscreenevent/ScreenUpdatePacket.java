@@ -1,7 +1,8 @@
 package com.negativestudios.playerscreenevent;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -54,9 +55,8 @@ public final class ScreenUpdatePacket {
 
     public static void handle(ScreenUpdatePacket packet, Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
-        context.enqueueWork(() -> {
-            if (context.getDirection().getReceptionSide().isClient()) {
-                Minecraft.getInstance().execute(() -> PlayerScreenOverlay.receive(
+        context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
+                PlayerScreenOverlay.receive(
                         packet.active,
                         packet.title,
                         packet.playerCount,
@@ -64,9 +64,8 @@ public final class ScreenUpdatePacket {
                         packet.joinedPlayer,
                         packet.imageBytes,
                         packet.canOpenChat
-                ));
-            }
-        });
+                )
+        ));
         context.setPacketHandled(true);
     }
 }
