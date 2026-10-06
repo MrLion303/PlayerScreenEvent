@@ -1,5 +1,6 @@
 package com.negativestudios.playerscreenevent;
 
+import com.mojang.logging.LogUtils;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
@@ -12,8 +13,10 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.slf4j.Logger;
 
 public final class PlayerScreenConfig {
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static ForgeConfigSpec SPEC;
 
     public static ForgeConfigSpec.ConfigValue<String> TITLE;
@@ -74,7 +77,7 @@ public final class PlayerScreenConfig {
             Files.createDirectories(directory);
             createDefaultImage(directory.resolve("screen.png"));
         } catch (IOException exception) {
-            PlayerScreenEvent.LOGGER.error("No se pudo crear la carpeta de configuracion de PlayerScreenEvent.", exception);
+            LOGGER.error("No se pudo crear la carpeta de configuracion de PlayerScreenEvent.", exception);
         }
     }
 
