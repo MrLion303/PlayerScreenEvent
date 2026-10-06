@@ -1,10 +1,8 @@
 package com.negativestudios.playerscreenevent;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.LiteralArgumentType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
-import net.minecraftforge.server.command.EnumArgument;
 
 import static net.minecraft.commands.Commands.literal;
 
