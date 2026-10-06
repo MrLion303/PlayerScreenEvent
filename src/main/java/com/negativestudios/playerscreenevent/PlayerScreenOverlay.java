@@ -101,8 +101,14 @@ public final class PlayerScreenOverlay {
             }
 
             dynamicTexture = new DynamicTexture(nativeImage);
+            dynamicTexture.upload();
+
+            if (textureLocation != null) {
+                Minecraft.getInstance().getTextureManager().release(textureLocation);
+            }
+
             textureLocation = Minecraft.getInstance().getTextureManager().register(
-                    "playerscreenevent/screen", dynamicTexture
+                    "playerscreenevent/screen_" + System.nanoTime(), dynamicTexture
             );
             textureWidth = image.getWidth();
             textureHeight = image.getHeight();
@@ -165,19 +171,19 @@ public final class PlayerScreenOverlay {
             if (textureLocation != null && textureWidth > 0 && textureHeight > 0) {
                 RenderSystem.setShaderTexture(0, textureLocation);
 
-                double screenAspect = width / (double) height;
-                double imageAspect = textureWidth / (double) textureHeight;
+                float screenAspect = width / (float) height;
+                float imageAspect = textureWidth / (float) textureHeight;
 
                 if (screenAspect > imageAspect) {
-                    double visibleHeight = textureWidth / screenAspect;
-                    double v = (textureHeight - visibleHeight) / 2.0;
-                    gui.blit(textureLocation, 0, 0, 0,
-                            0.0f, (float) v, width, height, textureWidth, textureHeight);
+                    int drawHeight = Math.round(width / imageAspect);
+                    int y = (height - drawHeight) / 2;
+                    gui.blit(textureLocation, 0, y, 0, 0, width, drawHeight,
+                            textureWidth, textureHeight);
                 } else {
-                    double visibleWidth = textureHeight * screenAspect;
-                    double u = (textureWidth - visibleWidth) / 2.0;
-                    gui.blit(textureLocation, 0, 0, 0,
-                            (float) u, 0.0f, width, height, textureWidth, textureHeight);
+                    int drawWidth = Math.round(height * imageAspect);
+                    int x = (width - drawWidth) / 2;
+                    gui.blit(textureLocation, x, 0, 0, 0, drawWidth, height,
+                            textureWidth, textureHeight);
                 }
             } else {
                 gui.fill(0, 0, width, height, (alphaByte << 24) | 0x00FFFFFF);
@@ -191,7 +197,7 @@ public final class PlayerScreenOverlay {
             drawCentered(gui, playerCount + "/" + maxPlayers, countY, 1.0f, alphaByte, 0xFFFFFFFF);
 
             if (!joinedPlayer.isEmpty()) {
-                drawCentered(gui, joinedPlayer + " se ha unido.", joinedY, 0.72f, alphaByte, 0xFFFF5555);
+                drawCentered(gui, joinedPlayer + " se ha unido.", joinedY, 1.0f, alphaByte, 0xFFFF5555);
             }
 
             RenderSystem.disableBlend();
