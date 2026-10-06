@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -29,10 +28,6 @@ public final class ServerScreenManager {
     private static byte[] imageBytes = new byte[0];
 
     private ServerScreenManager() {}
-
-    public static boolean isActive() {
-        return active;
-    }
 
     public static int getMaxPlayers(MinecraftServer server) {
         int configured = PlayerScreenConfig.MAX_PLAYERS.get();
@@ -88,6 +83,20 @@ public final class ServerScreenManager {
     }
 
     @SubscribeEvent
+    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (!active || !(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return;
+        }
+
+        server.execute(() -> broadcast(server, false, lastJoined));
+    }
+
+    @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
         active = false;
         lastJoined = "";
@@ -110,18 +119,15 @@ public final class ServerScreenManager {
             return;
         }
 
-        int maxPlayers = getMaxPlayers(server);
-        byte[] image = includeImage ? imageBytes : null;
-
         NetworkHandler.CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
                 new ScreenUpdatePacket(
                         active,
                         PlayerScreenConfig.TITLE.get(),
                         server.getPlayerList().getPlayerCount(),
-                        maxPlayers,
+                        getMaxPlayers(server),
                         joinedPlayer,
-                        image,
+                        includeImage ? imageBytes : null,
                         player.hasPermissions(2)
                 )
         );
