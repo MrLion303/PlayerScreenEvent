@@ -7,6 +7,7 @@ import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
@@ -81,8 +82,8 @@ public final class PlayerScreenOverlay {
                 return;
             }
 
-            net.minecraft.client.renderer.texture.NativeImage nativeImage =
-                    new net.minecraft.client.renderer.texture.NativeImage(image.getWidth(), image.getHeight(), false);
+            NativeImage nativeImage =
+                    new NativeImage(image.getWidth(), image.getHeight(), false);
 
             for (int y = 0; y < image.getHeight(); y++) {
                 for (int x = 0; x < image.getWidth(); x++) {
@@ -186,7 +187,7 @@ public final class PlayerScreenOverlay {
             int countY = (int) (height * 0.565f);
             int joinedY = (int) (height * 0.625f);
 
-            drawCentered(gui, title, titleY, 1.0f, alphaByte, 0xFFFFFFFF);
+            drawCentered(gui, PlayerScreenOverlay.title, titleY, 1.0f, alphaByte, 0xFFFFFFFF);
             drawCentered(gui, playerCount + "/" + maxPlayers, countY, 1.0f, alphaByte, 0xFFFFFFFF);
 
             if (!joinedPlayer.isEmpty()) {
@@ -254,7 +255,7 @@ public final class PlayerScreenOverlay {
         }
 
         @Override
-        public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        public boolean mouseScrolled(double mouseX, double mouseY, double scrollY) {
             return true;
         }
     }
