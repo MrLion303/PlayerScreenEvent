@@ -171,20 +171,7 @@ public final class PlayerScreenOverlay {
             if (textureLocation != null && textureWidth > 0 && textureHeight > 0) {
                 RenderSystem.setShaderTexture(0, textureLocation);
 
-                float screenAspect = width / (float) height;
-                float imageAspect = textureWidth / (float) textureHeight;
-
-                if (screenAspect > imageAspect) {
-                    int drawHeight = Math.round(width / imageAspect);
-                    int y = (height - drawHeight) / 2;
-                    gui.blit(textureLocation, 0, y, 0, 0, width, drawHeight,
-                            textureWidth, textureHeight);
-                } else {
-                    int drawWidth = Math.round(height * imageAspect);
-                    int x = (width - drawWidth) / 2;
-                    gui.blit(textureLocation, x, 0, 0, 0, drawWidth, height,
-                            textureWidth, textureHeight);
-                }
+                gui.blit(textureLocation, 0, 0, 0, 0, width, height, textureWidth, textureHeight);
             } else {
                 gui.fill(0, 0, width, height, (alphaByte << 24) | 0x00FFFFFF);
             }
@@ -193,11 +180,11 @@ public final class PlayerScreenOverlay {
             int countY = (int) (height * 0.565f);
             int joinedY = (int) (height * 0.625f);
 
-            drawCentered(gui, PlayerScreenOverlay.title, titleY, 1.0f, alphaByte, 0xFFFFFFFF);
-            drawCentered(gui, playerCount + "/" + maxPlayers, countY, 1.0f, alphaByte, 0xFFFFFFFF);
+            drawCentered(gui, PlayerScreenOverlay.title, titleY, 2.5f, alphaByte, 0xFFFFFFFF);
+            drawCentered(gui, playerCount + "/" + maxPlayers, countY, 1.35f, alphaByte, 0xFFFFFFFF);
 
             if (!joinedPlayer.isEmpty()) {
-                drawCentered(gui, joinedPlayer + " se ha unido.", joinedY, 1.0f, alphaByte, 0xFFFF5555);
+                drawCentered(gui, joinedPlayer + " se ha unido.", joinedY, 1.15f, alphaByte, 0xFFFF5555);
             }
 
             RenderSystem.disableBlend();
