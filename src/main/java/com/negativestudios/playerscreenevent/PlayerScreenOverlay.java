@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -145,7 +146,7 @@ public final class PlayerScreenOverlay {
 
         @Override
         public boolean isPauseScreen() {
-            return false;
+            return true;
         }
 
         @Override
@@ -209,6 +210,11 @@ public final class PlayerScreenOverlay {
 
         @Override
         public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                minecraft.setScreen(new WaitingPauseScreen());
+                return true;
+            }
+
             if (canOpenChat && keyCode == GLFW.GLFW_KEY_T) {
                 minecraft.setScreen(new WaitingChatScreen(""));
                 return true;
@@ -250,6 +256,21 @@ public final class PlayerScreenOverlay {
         @Override
         public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
             return true;
+        }
+    }
+
+    public static final class WaitingPauseScreen extends PauseScreen {
+        public WaitingPauseScreen() {
+            super(true);
+        }
+
+        @Override
+        public void onClose() {
+            if (active && !fading) {
+                minecraft.setScreen(new WaitingScreen());
+            } else {
+                minecraft.setScreen(null);
+            }
         }
     }
 
