@@ -171,7 +171,7 @@ public final class PlayerScreenOverlay {
             if (textureLocation != null && textureWidth > 0 && textureHeight > 0) {
                 RenderSystem.setShaderTexture(0, textureLocation);
 
-                gui.blit(textureLocation, 0, 0, 0, 0, width, height, textureWidth, textureHeight);
+                gui.blit(textureLocation, 0, 0, width, height, 0, 0, textureWidth, textureHeight, textureWidth, textureHeight);
             } else {
                 gui.fill(0, 0, width, height, (alphaByte << 24) | 0x00FFFFFF);
             }
