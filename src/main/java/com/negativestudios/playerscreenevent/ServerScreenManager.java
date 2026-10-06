@@ -134,7 +134,7 @@ public final class ServerScreenManager {
     }
 
     private static byte[] loadAndValidateImage(MinecraftServer server) throws IOException {
-        Path path = server.getServerDirectory().resolve(PlayerScreenConfig.IMAGE_PATH.get()).normalize();
+        Path path = PlayerScreenConfig.getImagePath();
 
         if (!Files.exists(path)) {
             throw new IOException("No existe " + path + ". Coloca una imagen 16:9 de al menos 1280x720.");
