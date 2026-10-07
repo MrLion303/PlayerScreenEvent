@@ -14,7 +14,9 @@ public final class PlayerScreenCommand {
                 literal("playerscreen")
                         .requires(source -> source.hasPermission(2))
                         .then(literal("show").executes(context -> show(context.getSource())))
-                        .then(literal("hide").executes(context -> hide(context.getSource())))
+                        .then(literal("hide")
+                                .executes(context -> hide(context.getSource()))
+                                .then(literal("me").executes(context -> hideMe(context.getSource()))))
         );
     }
 
@@ -28,7 +30,23 @@ public final class PlayerScreenCommand {
             return 0;
         }
 
-        source.sendSuccess(() -> Component.literal("PlayerScreenEvent: pantalla activada."), true);
+        source.sendSuccess(() -> Component.literal("PlayerScreenEvent: pantalla activada."), false);
+        return 1;
+    }
+
+    private static int hideMe(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof net.minecraft.server.level.ServerPlayer player)) {
+            source.sendFailure(Component.literal("Este comando solo puede usarlo un jugador."));
+            return 0;
+        }
+
+        if (!ServerScreenManager.isActive()) {
+            source.sendFailure(Component.literal("La pantalla no está activa."));
+            return 0;
+        }
+
+        ServerScreenManager.hideForPlayer(player);
+        source.sendSuccess(() -> Component.literal("PlayerScreenEvent: pantalla ocultada para ti."), false);
         return 1;
     }
 
@@ -38,7 +56,7 @@ public final class PlayerScreenCommand {
         }
 
         ServerScreenManager.hide(source.getServer());
-        source.sendSuccess(() -> Component.literal("PlayerScreenEvent: pantalla desactivada."), true);
+        source.sendSuccess(() -> Component.literal("PlayerScreenEvent: pantalla desactivada."), false);
         return 1;
     }
 }
