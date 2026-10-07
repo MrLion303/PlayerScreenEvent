@@ -20,12 +20,16 @@ import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 import java.awt.image.BufferedImage;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 
 public final class ServerScreenManager {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static boolean active;
     private static String lastJoined = "";
     private static byte[] imageBytes = new byte[0];
+    private static final Set<UUID> hiddenPlayers = new HashSet<>();
 
     private ServerScreenManager() {}
 
@@ -46,6 +50,7 @@ public final class ServerScreenManager {
         active = true;
         lastJoined = "";
         imageBytes = loaded;
+        hiddenPlayers.clear();
 
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             send(player, true);
@@ -61,6 +66,7 @@ public final class ServerScreenManager {
         active = false;
         lastJoined = "";
         imageBytes = new byte[0];
+        hiddenPlayers.clear();
 
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             send(player, false);
@@ -78,10 +84,11 @@ public final class ServerScreenManager {
             return;
         }
 
+        hiddenPlayers.remove(player.getUUID());
         lastJoined = player.getGameProfile().getName();
         send(player, true, lastJoined);
         for (ServerPlayer other : server.getPlayerList().getPlayers()) {
-            if (other != player) send(other, false, lastJoined);
+            if (other != player && !hiddenPlayers.contains(other.getUUID())) send(other, false, lastJoined);
         }
     }
 
@@ -125,12 +132,38 @@ public final class ServerScreenManager {
         NetworkHandler.CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
                 new ScreenUpdatePacket(
-                        active,
+                        active && !hiddenPlayers.contains(player.getUUID()),
                         PlayerScreenConfig.TITLE.get(),
                         server.getPlayerList().getPlayerCount(),
                         getMaxPlayers(server),
                         joinedPlayer,
                         includeImage ? imageBytes : null,
+                        player.hasPermissions(2)
+                )
+        );
+    }
+
+    public static void hideForPlayer(ServerPlayer player) {
+        if (!active) {
+            return;
+        }
+
+        hiddenPlayers.add(player.getUUID());
+
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return;
+        }
+
+        NetworkHandler.CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                new ScreenUpdatePacket(
+                        false,
+                        PlayerScreenConfig.TITLE.get(),
+                        server.getPlayerList().getPlayerCount(),
+                        getMaxPlayers(server),
+                        "",
+                        null,
                         player.hasPermissions(2)
                 )
         );
