@@ -296,10 +296,9 @@ public final class PlayerScreenOverlay {
         }
 
         @Override
-        public void renderBackground(GuiGraphics gui, int mouseX, int mouseY, float partialTick) {
-            // PauseScreen normalmente deja ver el mundo detrás del menú.
-            // Durante la espera, sustituimos ese fondo por la misma pantalla de espera.
-            renderWaitingContent(this, gui, mouseX, mouseY, partialTick);
+        public void renderBackground(GuiGraphics gui) {
+            // Durante la espera, sustituimos el mundo de fondo por la misma pantalla de espera.
+            renderWaitingContent(this, gui, 0, 0, 0.0f);
         }
 
         private void disableWaitingOptions() {
