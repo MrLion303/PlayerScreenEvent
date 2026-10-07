@@ -359,7 +359,6 @@ public final class PlayerScreenOverlay {
             return super.mouseClicked(mouseX, mouseY, button);
         }
 
-        @Override
         public void removed() {
             super.removed();
 
