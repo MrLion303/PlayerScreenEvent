@@ -1,15 +1,15 @@
 package com.negativestudios.playerscreenevent;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.ChatScreen;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.ResourceLocation;
@@ -62,7 +62,8 @@ public final class PlayerScreenOverlay {
             fadeStart = 0L;
 
             if (!(minecraft.screen instanceof WaitingScreen) &&
-                    !(minecraft.screen instanceof WaitingChatScreen)) {
+                    !(minecraft.screen instanceof WaitingChatScreen) &&
+                    !(minecraft.screen instanceof WaitingPauseScreen)) {
                 minecraft.setScreen(new WaitingScreen());
             }
             return;
@@ -126,7 +127,9 @@ public final class PlayerScreenOverlay {
         fadeStart = 0L;
 
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.screen instanceof WaitingScreen || minecraft.screen instanceof WaitingChatScreen) {
+        if (minecraft.screen instanceof WaitingScreen ||
+                minecraft.screen instanceof WaitingChatScreen ||
+                minecraft.screen instanceof WaitingPauseScreen) {
             minecraft.setScreen(null);
         }
     }
@@ -142,6 +145,69 @@ public final class PlayerScreenOverlay {
             return 0.0f;
         }
         return 1.0f - progress;
+    }
+
+    private static float getResponsiveScale() {
+        Minecraft minecraft = Minecraft.getInstance();
+        double windowWidth = minecraft.getWindow().getWidth();
+        double windowHeight = minecraft.getWindow().getHeight();
+
+        if (windowWidth <= 0 || windowHeight <= 0) {
+            return 1.0f;
+        }
+
+        double scale = Math.min(windowWidth / 1600.0, windowHeight / 900.0);
+        return (float) Math.max(0.5, Math.min(1.5, scale));
+    }
+
+    private static void renderWaitingContent(Screen screen, GuiGraphics gui, int mouseX, int mouseY, float partialTick) {
+        float alpha = getAlpha();
+        if (alpha <= 0.0f) {
+            return;
+        }
+
+        int alphaByte = Math.max(0, Math.min(255, (int) (alpha * 255.0f)));
+
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+
+        if (textureLocation != null && textureWidth > 0 && textureHeight > 0) {
+            RenderSystem.setShaderTexture(0, textureLocation);
+            gui.blit(textureLocation, 0, 0, screen.width, screen.height,
+                    0, 0, textureWidth, textureHeight, textureWidth, textureHeight);
+        } else {
+            gui.fill(0, 0, screen.width, screen.height, (alphaByte << 24) | 0x00FFFFFF);
+        }
+
+        int titleY = (int) (screen.height * 0.47f);
+        int countY = (int) (screen.height * 0.565f);
+        int joinedY = (int) (screen.height * 0.625f);
+
+        float responsiveScale = getResponsiveScale();
+
+        drawCentered(screen, gui, title, titleY, 4.0f * responsiveScale, alphaByte, 0xFFFFFFFF);
+        drawCentered(screen, gui, playerCount + "/" + maxPlayers, countY,
+                1.75f * responsiveScale, alphaByte, 0xFFFFFFFF);
+
+        if (!joinedPlayer.isEmpty()) {
+            drawCentered(screen, gui, joinedPlayer + " se ha unido.", joinedY,
+                    1.5f * responsiveScale, alphaByte, 0xFFFF5555);
+        }
+
+        RenderSystem.disableBlend();
+    }
+
+    private static void drawCentered(Screen screen, GuiGraphics gui, String text, int y,
+                                     float scale, int alpha, int color) {
+        gui.pose().pushPose();
+        gui.pose().translate(screen.width / 2.0f, y, 0.0f);
+        gui.pose().scale(scale, scale, 1.0f);
+
+        int textWidth = screen.getMinecraft().font.width(text);
+        int finalColor = (alpha << 24) | (color & 0x00FFFFFF);
+        gui.drawString(screen.getMinecraft().font, text, -textWidth / 2, 0, finalColor, false);
+
+        gui.pose().popPose();
     }
 
     public static class WaitingScreen extends Screen {
@@ -161,62 +227,7 @@ public final class PlayerScreenOverlay {
 
         @Override
         public void render(GuiGraphics gui, int mouseX, int mouseY, float partialTick) {
-            float alpha = getAlpha();
-            if (alpha <= 0.0f) {
-                return;
-            }
-
-            int alphaByte = Math.max(0, Math.min(255, (int) (alpha * 255.0f)));
-
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-
-            if (textureLocation != null && textureWidth > 0 && textureHeight > 0) {
-                RenderSystem.setShaderTexture(0, textureLocation);
-
-                gui.blit(textureLocation, 0, 0, width, height, 0, 0, textureWidth, textureHeight, textureWidth, textureHeight);
-            } else {
-                gui.fill(0, 0, width, height, (alphaByte << 24) | 0x00FFFFFF);
-            }
-
-            int titleY = (int) (height * 0.47f);
-            int countY = (int) (height * 0.565f);
-            int joinedY = (int) (height * 0.625f);
-
-            float responsiveScale = getResponsiveScale();
-
-            drawCentered(gui, PlayerScreenOverlay.title, titleY, 4.0f * responsiveScale, alphaByte, 0xFFFFFFFF);
-            drawCentered(gui, playerCount + "/" + maxPlayers, countY, 1.75f * responsiveScale, alphaByte, 0xFFFFFFFF);
-
-            if (!joinedPlayer.isEmpty()) {
-                drawCentered(gui, joinedPlayer + " se ha unido.", joinedY, 1.5f * responsiveScale, alphaByte, 0xFFFF5555);
-            }
-
-            RenderSystem.disableBlend();
-        }
-
-        private float getResponsiveScale() {
-            double windowWidth = minecraft.getWindow().getWidth();
-            double windowHeight = minecraft.getWindow().getHeight();
-
-            if (windowWidth <= 0 || windowHeight <= 0) {
-                return 1.0f;
-            }
-
-            double scale = Math.min(windowWidth / 1600.0, windowHeight / 900.0);
-            return (float) Math.max(0.5, Math.min(1.5, scale));
-        }
-
-        private void drawCentered(GuiGraphics gui, String text, int y, float scale, int alpha, int color) {
-            gui.pose().pushPose();
-            gui.pose().translate(width / 2.0f, y, 0.0f);
-            gui.pose().scale(scale, scale, 1.0f);
-
-            int textWidth = font.width(text);
-            int finalColor = (alpha << 24) | (color & 0x00FFFFFF);
-            gui.drawString(font, text, -textWidth / 2, 0, finalColor, false);
-
-            gui.pose().popPose();
+            renderWaitingContent(this, gui, mouseX, mouseY, partialTick);
         }
 
         @Override
@@ -284,6 +295,13 @@ public final class PlayerScreenOverlay {
             }
         }
 
+        @Override
+        public void renderBackground(GuiGraphics gui, int mouseX, int mouseY, float partialTick) {
+            // PauseScreen normalmente deja ver el mundo detrás del menú.
+            // Durante la espera, sustituimos ese fondo por la misma pantalla de espera.
+            renderWaitingContent(this, gui, mouseX, mouseY, partialTick);
+        }
+
         private void disableWaitingOptions() {
             for (GuiEventListener child : children()) {
                 if (!(child instanceof Button button)) {
@@ -317,13 +335,36 @@ public final class PlayerScreenOverlay {
             };
         }
 
+        private boolean isReturnToGameButton(Button button) {
+            if (!(button.getMessage().getContents() instanceof TranslatableContents contents)) {
+                return false;
+            }
+
+            return "menu.returnToGame".equals(contents.getKey());
+        }
+
+        @Override
+        public boolean mouseClicked(double mouseX, double mouseY, int button) {
+            if (active && !fading && button == 0) {
+                for (GuiEventListener child : children()) {
+                    if (child instanceof Button pauseButton &&
+                            isReturnToGameButton(pauseButton) &&
+                            pauseButton.isMouseOver(mouseX, mouseY)) {
+                        minecraft.setScreen(new WaitingScreen());
+                        return true;
+                    }
+                }
+            }
+
+            return super.mouseClicked(mouseX, mouseY, button);
+        }
+
         @Override
         public void removed() {
             super.removed();
 
-            // El botón "Volver al juego" de PauseScreen cierra la pantalla
-            // directamente con setScreen(null), sin pasar por onClose().
-            // Si la pantalla de espera sigue activa, la restauramos.
+            // Algunas rutas de PauseScreen cierran directamente con setScreen(null).
+            // Si eso ocurre mientras la espera sigue activa, restauramos la pantalla.
             if (active && !fading && minecraft.screen == null) {
                 minecraft.setScreen(new WaitingScreen());
             }
