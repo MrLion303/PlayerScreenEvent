@@ -180,14 +180,28 @@ public final class PlayerScreenOverlay {
             int countY = (int) (height * 0.565f);
             int joinedY = (int) (height * 0.625f);
 
-            drawCentered(gui, PlayerScreenOverlay.title, titleY, 4.0f, alphaByte, 0xFFFFFFFF);
-            drawCentered(gui, playerCount + "/" + maxPlayers, countY, 1.75f, alphaByte, 0xFFFFFFFF);
+            float responsiveScale = getResponsiveScale();
+
+            drawCentered(gui, PlayerScreenOverlay.title, titleY, 4.0f * responsiveScale, alphaByte, 0xFFFFFFFF);
+            drawCentered(gui, playerCount + "/" + maxPlayers, countY, 1.75f * responsiveScale, alphaByte, 0xFFFFFFFF);
 
             if (!joinedPlayer.isEmpty()) {
-                drawCentered(gui, joinedPlayer + " se ha unido.", joinedY, 1.5f, alphaByte, 0xFFFF5555);
+                drawCentered(gui, joinedPlayer + " se ha unido.", joinedY, 1.5f * responsiveScale, alphaByte, 0xFFFF5555);
             }
 
             RenderSystem.disableBlend();
+        }
+
+        private float getResponsiveScale() {
+            double windowWidth = minecraft.getWindow().getWidth();
+            double windowHeight = minecraft.getWindow().getHeight();
+
+            if (windowWidth <= 0 || windowHeight <= 0) {
+                return 1.0f;
+            }
+
+            double scale = Math.min(windowWidth / 1600.0, windowHeight / 900.0);
+            return (float) Math.max(0.5, Math.min(1.5, scale));
         }
 
         private void drawCentered(GuiGraphics gui, String text, int y, float scale, int alpha, int color) {
