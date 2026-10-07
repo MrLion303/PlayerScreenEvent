@@ -33,6 +33,10 @@ public final class ServerScreenManager {
 
     private ServerScreenManager() {}
 
+    public static boolean isActive() {
+        return active;
+    }
+
     public static int getMaxPlayers(MinecraftServer server) {
         int configured = PlayerScreenConfig.MAX_PLAYERS.get();
         return configured < 0 ? server.getMaxPlayers() : configured;
