@@ -384,6 +384,12 @@ public final class PlayerScreenOverlay {
         }
 
         @Override
+        public void renderBackground(GuiGraphics gui) {
+            // El chat se muestra encima de la pantalla de espera, sin quitarla.
+            renderWaitingContent(this, gui, 0, 0, 0.0f);
+        }
+
+        @Override
         public void onClose() {
             if (active && !fading) {
                 minecraft.setScreen(new WaitingScreen());
