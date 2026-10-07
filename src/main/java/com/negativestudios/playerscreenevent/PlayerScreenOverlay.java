@@ -318,6 +318,18 @@ public final class PlayerScreenOverlay {
         }
 
         @Override
+        public void removed() {
+            super.removed();
+
+            // El botón "Volver al juego" de PauseScreen cierra la pantalla
+            // directamente con setScreen(null), sin pasar por onClose().
+            // Si la pantalla de espera sigue activa, la restauramos.
+            if (active && !fading && minecraft.screen == null) {
+                minecraft.setScreen(new WaitingScreen());
+            }
+        }
+
+        @Override
         public void onClose() {
             if (active && !fading) {
                 minecraft.setScreen(new WaitingScreen());
