@@ -6,9 +6,12 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.common.Mod;
@@ -270,6 +273,48 @@ public final class PlayerScreenOverlay {
     public static final class WaitingPauseScreen extends PauseScreen {
         public WaitingPauseScreen() {
             super(true);
+        }
+
+        @Override
+        protected void init() {
+            super.init();
+
+            if (active && !fading) {
+                disableWaitingOptions();
+            }
+        }
+
+        private void disableWaitingOptions() {
+            for (GuiEventListener child : children()) {
+                if (!(child instanceof Button button)) {
+                    continue;
+                }
+
+                if (isWaitingLockedButton(button)) {
+                    button.active = false;
+                }
+            }
+        }
+
+        private boolean isWaitingLockedButton(Button button) {
+            if (!(button.getMessage().getContents() instanceof TranslatableContents contents)) {
+                return false;
+            }
+
+            return switch (contents.getKey()) {
+                case "gui.advancements",
+                     "menu.advancements",
+                     "gui.stats",
+                     "menu.stats",
+                     "menu.sendFeedback",
+                     "menu.reportBugs",
+                     "menu.options",
+                     "menu.shareToLan",
+                     "menu.playerReporting",
+                     "gui.socialInteractions",
+                     "fml.menu.mods" -> true;
+                default -> false;
+            };
         }
 
         @Override
