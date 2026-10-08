@@ -64,40 +64,45 @@ public final class GifAnimation {
                         continue;
                     }
 
-                    BufferedImage frame = new BufferedImage(
-                            canvasWidth, canvasHeight, BufferedImage.TYPE_INT_ARGB
-                    );
+                    IIOMetadata metadata = reader.getImageMetadata(i);
+                    int frameX = readFramePosition(metadata, "imageLeftPosition");
+                    int frameY = readFramePosition(metadata, "imageTopPosition");
 
+                    // Guardamos el canvas anterior para disposal=restoreToPrevious.
+                    BufferedImage previousCanvas = copyImage(canvas);
+                    BufferedImage frame = copyImage(canvas);
+
+                    // Los GIF suelen almacenar solo un rectángulo de cambio.
+                    // Hay que respetar su posición dentro del lienzo; si se
+                    // dibuja siempre en (0,0), el contenido aparece arriba a la izquierda.
                     Graphics2D graphics = frame.createGraphics();
                     try {
-                        graphics.setComposite(AlphaComposite.Src);
-                        graphics.drawImage(canvas, 0, 0, null);
                         graphics.setComposite(AlphaComposite.SrcOver);
-                        graphics.drawImage(decoded, 0, 0, null);
+                        graphics.drawImage(decoded, frameX, frameY, null);
                     } finally {
                         graphics.dispose();
                     }
 
                     frames.add(frame);
-                    delays.add(readDelay(reader.getImageMetadata(i)));
+                    delays.add(readDelay(metadata));
 
-                    // Para los GIFs que usan disposal=2, la zona del frame debe
-                    // quedar transparente antes del siguiente frame. ImageIO ya
-                    // nos da el frame actual; guardamos el resultado visible y
-                    // limpiamos el canvas cuando corresponde.
-                    String disposal = readDisposalMethod(reader.getImageMetadata(i));
+                    String disposal = readDisposalMethod(metadata);
+
                     if ("restoreToBackgroundColor".equals(disposal)) {
                         Graphics2D clear = canvas.createGraphics();
                         try {
                             clear.setComposite(AlphaComposite.Clear);
-                            clear.fillRect(0, 0, canvasWidth, canvasHeight);
+                            clear.fillRect(
+                                    frameX,
+                                    frameY,
+                                    decoded.getWidth(),
+                                    decoded.getHeight()
+                            );
                         } finally {
                             clear.dispose();
                         }
                     } else if ("restoreToPrevious".equals(disposal)) {
-                        canvas = new BufferedImage(
-                                canvasWidth, canvasHeight, BufferedImage.TYPE_INT_ARGB
-                        );
+                        canvas = previousCanvas;
                     } else {
                         canvas = frame;
                     }
@@ -111,6 +116,48 @@ public final class GifAnimation {
             } finally {
                 reader.dispose();
             }
+        }
+    }
+
+    private static BufferedImage copyImage(BufferedImage source) {
+        BufferedImage copy = new BufferedImage(
+                source.getWidth(),
+                source.getHeight(),
+                BufferedImage.TYPE_INT_ARGB
+        );
+
+        Graphics2D graphics = copy.createGraphics();
+        try {
+            graphics.setComposite(AlphaComposite.Src);
+            graphics.drawImage(source, 0, 0, null);
+        } finally {
+            graphics.dispose();
+        }
+
+        return copy;
+    }
+
+    private static int readFramePosition(IIOMetadata metadata, String attributeName) {
+        if (metadata == null) {
+            return 0;
+        }
+
+        Node root = metadata.getAsTree("javax_imageio_gif_image_1.0");
+        Node descriptor = findNode(root, "ImageDescriptor");
+        if (descriptor == null) {
+            return 0;
+        }
+
+        NamedNodeMap attributes = descriptor.getAttributes();
+        Node value = attributes == null ? null : attributes.getNamedItem(attributeName);
+        if (value == null) {
+            return 0;
+        }
+
+        try {
+            return Math.max(0, Integer.parseInt(value.getNodeValue()));
+        } catch (NumberFormatException ignored) {
+            return 0;
         }
     }
 
