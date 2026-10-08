@@ -84,6 +84,24 @@ public final class PlayerScreenOverlay {
         }
     }
 
+    private static void stopGif() {
+        if (gifAnimation != null) {
+            gifAnimation.close();
+            gifAnimation = null;
+        }
+    }
+
+    private static void releaseTexture() {
+        if (textureLocation != null) {
+            Minecraft.getInstance().getTextureManager().release(textureLocation);
+            textureLocation = null;
+        }
+        if (dynamicTexture != null) {
+            dynamicTexture.close();
+            dynamicTexture = null;
+        }
+    }
+
     private static void updateGif(byte[] bytes) {
         try {
             GifAnimation animation = GifAnimation.fromBytes(bytes);
