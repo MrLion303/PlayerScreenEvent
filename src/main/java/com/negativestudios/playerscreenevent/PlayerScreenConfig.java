@@ -14,6 +14,12 @@ import javax.imageio.ImageIO;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import javax.imageio.IIOImage;
+import javax.imageio.ImageTypeSpecifier;
+import javax.imageio.ImageWriter;
+import javax.imageio.metadata.IIOMetadata;
+import javax.imageio.metadata.IIOMetadataNode;
+import javax.imageio.stream.ImageOutputStream;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
@@ -159,6 +165,37 @@ public final class PlayerScreenConfig {
             return;
         }
 
-        createDefaultImage(path);
+        BufferedImage image = new BufferedImage(1280, 720, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = image.createGraphics();
+
+        try {
+            graphics.fillRect(0, 0, image.getWidth(), image.getHeight());
+        } finally {
+            graphics.dispose();
+        }
+
+        ImageWriter writer = ImageIO.getImageWritersByFormatName("gif").next();
+        try (ImageOutputStream output = ImageIO.createImageOutputStream(path.toFile())) {
+            writer.setOutput(output);
+            writer.prepareWriteSequence(null);
+
+            ImageTypeSpecifier type = ImageTypeSpecifier.createFromRenderedImage(image);
+            IIOMetadata metadata = writer.getDefaultImageMetadata(type, writer.getDefaultWriteParam());
+            String format = "javax_imageio_gif_image_1.0";
+            IIOMetadataNode root = (IIOMetadataNode) metadata.getAsTree(format);
+            IIOMetadataNode gce = new IIOMetadataNode("GraphicControlExtension");
+            gce.setAttribute("disposalMethod", "none");
+            gce.setAttribute("userInputFlag", "FALSE");
+            gce.setAttribute("transparentColorFlag", "FALSE");
+            gce.setAttribute("delayTime", "10");
+            gce.setAttribute("transparentColorIndex", "0");
+            root.appendChild(gce);
+            metadata.setFromTree(format, root);
+
+            writer.writeToSequence(new IIOImage(image, null, metadata), writer.getDefaultWriteParam());
+            writer.endWriteSequence();
+        } finally {
+            writer.dispose();
+        }
     }
 }
