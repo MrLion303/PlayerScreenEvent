@@ -36,6 +36,7 @@ public final class PlayerScreenOverlay {
     private static boolean canOpenChat;
 
     private static DynamicTexture dynamicTexture;
+    private static GifAnimation gifAnimation;
     private static ResourceLocation textureLocation;
     private static int textureWidth;
     private static int textureHeight;
@@ -441,5 +442,4 @@ public final class PlayerScreenOverlay {
             }
         }
     }
-}
 }
