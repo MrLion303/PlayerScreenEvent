@@ -8,24 +8,29 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
 public final class ScreenUpdatePacket {
+    private static final int MAX_MEDIA_BYTES = 2_000_000;
+
     private final boolean active;
     private final String title;
     private final int playerCount;
     private final int maxPlayers;
     private final String joinedPlayer;
-    private final boolean hasImage;
-    private final byte[] imageBytes;
+    private final boolean hasMedia;
+    private final byte[] mediaBytes;
+    private final boolean animated;
     private final boolean canOpenChat;
 
     public ScreenUpdatePacket(boolean active, String title, int playerCount, int maxPlayers,
-                              String joinedPlayer, byte[] imageBytes, boolean canOpenChat) {
+                              String joinedPlayer, byte[] mediaBytes, boolean animated,
+                              boolean canOpenChat) {
         this.active = active;
         this.title = title;
         this.playerCount = playerCount;
         this.maxPlayers = maxPlayers;
         this.joinedPlayer = joinedPlayer == null ? "" : joinedPlayer;
-        this.hasImage = imageBytes != null && imageBytes.length > 0;
-        this.imageBytes = this.hasImage ? imageBytes : new byte[0];
+        this.hasMedia = mediaBytes != null && mediaBytes.length > 0;
+        this.mediaBytes = this.hasMedia ? mediaBytes : new byte[0];
+        this.animated = animated;
         this.canOpenChat = canOpenChat;
     }
 
@@ -35,10 +40,13 @@ public final class ScreenUpdatePacket {
         buf.writeVarInt(packet.playerCount);
         buf.writeVarInt(packet.maxPlayers);
         buf.writeUtf(packet.joinedPlayer, 64);
-        buf.writeBoolean(packet.hasImage);
-        if (packet.hasImage) {
-            buf.writeByteArray(packet.imageBytes);
+        buf.writeBoolean(packet.hasMedia);
+
+        if (packet.hasMedia) {
+            buf.writeByteArray(packet.mediaBytes);
         }
+
+        buf.writeBoolean(packet.animated);
         buf.writeBoolean(packet.canOpenChat);
     }
 
@@ -48,13 +56,21 @@ public final class ScreenUpdatePacket {
         int playerCount = buf.readVarInt();
         int maxPlayers = buf.readVarInt();
         String joinedPlayer = buf.readUtf(64);
-        byte[] image = buf.readBoolean() ? buf.readByteArray(2_000_000) : new byte[0];
+        byte[] media = buf.readBoolean()
+                ? buf.readByteArray(MAX_MEDIA_BYTES)
+                : new byte[0];
+        boolean animated = buf.readBoolean();
         boolean canOpenChat = buf.readBoolean();
-        return new ScreenUpdatePacket(active, title, playerCount, maxPlayers, joinedPlayer, image, canOpenChat);
+
+        return new ScreenUpdatePacket(
+                active, title, playerCount, maxPlayers, joinedPlayer,
+                media, animated, canOpenChat
+        );
     }
 
     public static void handle(ScreenUpdatePacket packet, Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
+
         context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
                 PlayerScreenOverlay.receive(
                         packet.active,
@@ -62,10 +78,12 @@ public final class ScreenUpdatePacket {
                         packet.playerCount,
                         packet.maxPlayers,
                         packet.joinedPlayer,
-                        packet.imageBytes,
+                        packet.mediaBytes,
+                        packet.animated,
                         packet.canOpenChat
                 )
         ));
+
         context.setPacketHandled(true);
     }
 }
