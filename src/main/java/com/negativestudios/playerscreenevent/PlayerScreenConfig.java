@@ -84,7 +84,7 @@ public final class PlayerScreenConfig {
     private static Path resolveFilename(String configured, String fallback) {
         String filename = configured == null ? "" : configured.trim();
 
-        if (filename.isEmpty() || filename.contains("/") || filename.contains("\") ||
+        if (filename.isEmpty() || filename.contains("/") || filename.contains("\\") ||
                 filename.equals(".") || filename.equals("..")) {
             filename = fallback;
         }
