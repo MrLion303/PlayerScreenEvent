@@ -81,9 +81,15 @@ Los archivos multimedia enviados a los clientes tienen un límite de aproximadam
 - Si la pantalla principal y la segunda pantalla GIF están activas al mismo tiempo, la segunda pantalla GIF tiene prioridad visual. Al ocultarla, vuelve automáticamente la pantalla principal si esta sigue activa.
 - `hide me` solo oculta la pantalla correspondiente para ese jugador.
 
+## Chat sobre las pantallas
+
+Cuando un jugador con OP abre el chat con `T` o `/` mientras una pantalla está activa, el chat se renderiza **encima de la pantalla de espera**. La pantalla no desaparece ni muestra temporalmente el mundo. Al cerrar el chat, la pantalla de espera continúa activa.
+
+Esto funciona tanto con la pantalla principal como con la segunda pantalla GIF.
+
 ## GIF
 
-Los GIF se decodifican en el cliente usando el soporte de imágenes de Java, sin añadir dependencias externas. Se respetan los tiempos de cada frame y el GIF se repite automáticamente.
+Los GIF se decodifican en el cliente usando el soporte de imágenes de Java, sin añadir dependencias externas. Se respetan los tiempos de cada frame y el GIF se repite automáticamente. La pantalla principal también puede utilizar un GIF mediante el campo `imagen`.
 
 ## Build
 
