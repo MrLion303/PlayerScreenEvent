@@ -11,6 +11,8 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.stream.ImageInputStream;
+import java.awt.AlphaComposite;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -40,25 +42,72 @@ public final class GifAnimation {
         List<Integer> delays = new ArrayList<>();
 
         try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
-            if (input == null) throw new IOException("No se pudo abrir el GIF.");
+            if (input == null) {
+                throw new IOException("No se pudo abrir el GIF.");
+            }
 
             ImageReader reader = ImageIO.getImageReadersByFormatName("gif").next();
             try {
                 reader.setInput(input, false, false);
+
                 int count = reader.getNumImages(true);
-                int width = reader.getWidth(0);
-                int height = reader.getHeight(0);
+                int canvasWidth = reader.getWidth(0);
+                int canvasHeight = reader.getHeight(0);
+
+                BufferedImage canvas = new BufferedImage(
+                        canvasWidth, canvasHeight, BufferedImage.TYPE_INT_ARGB
+                );
 
                 for (int i = 0; i < count; i++) {
-                    BufferedImage frame = reader.read(i);
-                    if (frame != null) {
-                        frames.add(frame);
-                        delays.add(readDelay(reader.getImageMetadata(i)));
+                    BufferedImage decoded = reader.read(i);
+                    if (decoded == null) {
+                        continue;
+                    }
+
+                    BufferedImage frame = new BufferedImage(
+                            canvasWidth, canvasHeight, BufferedImage.TYPE_INT_ARGB
+                    );
+
+                    Graphics2D graphics = frame.createGraphics();
+                    try {
+                        graphics.setComposite(AlphaComposite.Src);
+                        graphics.drawImage(canvas, 0, 0, null);
+                        graphics.setComposite(AlphaComposite.SrcOver);
+                        graphics.drawImage(decoded, 0, 0, null);
+                    } finally {
+                        graphics.dispose();
+                    }
+
+                    frames.add(frame);
+                    delays.add(readDelay(reader.getImageMetadata(i)));
+
+                    // Para los GIFs que usan disposal=2, la zona del frame debe
+                    // quedar transparente antes del siguiente frame. ImageIO ya
+                    // nos da el frame actual; guardamos el resultado visible y
+                    // limpiamos el canvas cuando corresponde.
+                    String disposal = readDisposalMethod(reader.getImageMetadata(i));
+                    if ("restoreToBackgroundColor".equals(disposal)) {
+                        Graphics2D clear = canvas.createGraphics();
+                        try {
+                            clear.setComposite(AlphaComposite.Clear);
+                            clear.fillRect(0, 0, canvasWidth, canvasHeight);
+                        } finally {
+                            clear.dispose();
+                        }
+                    } else if ("restoreToPrevious".equals(disposal)) {
+                        canvas = new BufferedImage(
+                                canvasWidth, canvasHeight, BufferedImage.TYPE_INT_ARGB
+                        );
+                    } else {
+                        canvas = frame;
                     }
                 }
 
-                if (frames.isEmpty()) throw new IOException("El GIF no contiene frames.");
-                return new GifAnimation(frames, delays, width, height);
+                if (frames.isEmpty()) {
+                    throw new IOException("El GIF no contiene frames.");
+                }
+
+                return new GifAnimation(frames, delays, canvasWidth, canvasHeight);
             } finally {
                 reader.dispose();
             }
@@ -66,15 +115,21 @@ public final class GifAnimation {
     }
 
     private static int readDelay(IIOMetadata metadata) {
-        if (metadata == null) return 100;
+        if (metadata == null) {
+            return 100;
+        }
 
         Node root = metadata.getAsTree("javax_imageio_gif_image_1.0");
         Node extension = findNode(root, "GraphicControlExtension");
-        if (extension == null) return 100;
+        if (extension == null) {
+            return 100;
+        }
 
         NamedNodeMap attributes = extension.getAttributes();
         Node delay = attributes == null ? null : attributes.getNamedItem("delayTime");
-        if (delay == null) return 100;
+        if (delay == null) {
+            return 100;
+        }
 
         try {
             return Math.max(20, Integer.parseInt(delay.getNodeValue()) * 10);
@@ -83,14 +138,38 @@ public final class GifAnimation {
         }
     }
 
+    private static String readDisposalMethod(IIOMetadata metadata) {
+        if (metadata == null) {
+            return "none";
+        }
+
+        Node root = metadata.getAsTree("javax_imageio_gif_image_1.0");
+        Node extension = findNode(root, "GraphicControlExtension");
+        if (extension == null) {
+            return "none";
+        }
+
+        NamedNodeMap attributes = extension.getAttributes();
+        Node disposal = attributes == null ? null : attributes.getNamedItem("disposalMethod");
+        return disposal == null ? "none" : disposal.getNodeValue();
+    }
+
     private static Node findNode(Node node, String name) {
-        if (node == null) return null;
-        if (name.equals(node.getNodeName())) return node;
+        if (node == null) {
+            return null;
+        }
+
+        if (name.equals(node.getNodeName())) {
+            return node;
+        }
 
         for (Node child = node.getFirstChild(); child != null; child = child.getNextSibling()) {
             Node found = findNode(child, name);
-            if (found != null) return found;
+            if (found != null) {
+                return found;
+            }
         }
+
         return null;
     }
 
@@ -100,13 +179,18 @@ public final class GifAnimation {
     }
 
     public void renderFrame() {
-        if (frames.isEmpty()) return;
+        if (frames.isEmpty()) {
+            return;
+        }
 
         long elapsed = Math.max(0L, System.currentTimeMillis() - startTime);
         long total = 0L;
-        for (int delay : delays) total += delay;
 
-        long position = total > 0 ? elapsed % total : 0L;
+        for (int delay : delays) {
+            total += delay;
+        }
+
+        long position = total > 0L ? elapsed % total : 0L;
         long accumulated = 0L;
         int frame = frames.size() - 1;
 
@@ -118,33 +202,43 @@ public final class GifAnimation {
             }
         }
 
-        if (frame == currentFrame && textureLocation != null) return;
+        if (frame == currentFrame && textureLocation != null) {
+            return;
+        }
+
         currentFrame = frame;
         uploadCurrentFrame();
     }
 
     private void uploadCurrentFrame() {
         BufferedImage image = frames.get(currentFrame);
-        NativeImage nativeImage = new NativeImage(width, height, false);
+
+        NativeImage nativeImage = new NativeImage(width, height, true);
 
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                int sourceX = Math.min(x, image.getWidth() - 1);
-                int sourceY = Math.min(y, image.getHeight() - 1);
-                int argb = image.getRGB(sourceX, sourceY);
+                int argb = image.getRGB(x, y);
+
                 int a = (argb >>> 24) & 255;
                 int r = (argb >>> 16) & 255;
                 int g = (argb >>> 8) & 255;
                 int b = argb & 255;
-                nativeImage.setPixelRGBA(x, y, (a << 24) | (b << 16) | (g << 8) | r);
+
+                nativeImage.setPixelRGBA(
+                        x, y,
+                        (a << 24) | (b << 16) | (g << 8) | r
+                );
             }
         }
 
         releaseTexture();
+
         dynamicTexture = new DynamicTexture(nativeImage);
         dynamicTexture.upload();
+
         textureLocation = Minecraft.getInstance().getTextureManager().register(
-                "playerscreenevent/gif_" + System.nanoTime(), dynamicTexture
+                "playerscreenevent/gif_" + System.nanoTime(),
+                dynamicTexture
         );
     }
 
@@ -153,16 +247,28 @@ public final class GifAnimation {
             Minecraft.getInstance().getTextureManager().release(textureLocation);
             textureLocation = null;
         }
+
         if (dynamicTexture != null) {
             dynamicTexture.close();
             dynamicTexture = null;
         }
     }
 
-    public ResourceLocation getTextureLocation() { return textureLocation; }
-    public int getFrameCount() { return frames.size(); }
-    public int getWidth() { return width; }
-    public int getHeight() { return height; }
+    public ResourceLocation getTextureLocation() {
+        return textureLocation;
+    }
+
+    public int getFrameCount() {
+        return frames.size();
+    }
+
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
+    }
 
     public void close() {
         releaseTexture();
