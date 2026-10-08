@@ -3,6 +3,7 @@ package com.negativestudios.playerscreenevent;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 
 import static net.minecraft.commands.Commands.literal;
 
@@ -17,6 +18,15 @@ public final class PlayerScreenCommand {
                         .then(literal("hide")
                                 .executes(context -> hide(context.getSource()))
                                 .then(literal("me").executes(context -> hideMe(context.getSource()))))
+        );
+
+        dispatcher.register(
+                literal("playerscreengif")
+                        .requires(source -> source.hasPermission(2))
+                        .then(literal("show").executes(context -> showGif(context.getSource())))
+                        .then(literal("hide")
+                                .executes(context -> hideGif(context.getSource()))
+                                .then(literal("me").executes(context -> hideGifMe(context.getSource()))))
         );
     }
 
@@ -35,7 +45,7 @@ public final class PlayerScreenCommand {
     }
 
     private static int hideMe(CommandSourceStack source) {
-        if (!(source.getEntity() instanceof net.minecraft.server.level.ServerPlayer player)) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
             source.sendFailure(Component.literal("Este comando solo puede usarlo un jugador."));
             return 0;
         }
@@ -57,6 +67,46 @@ public final class PlayerScreenCommand {
 
         ServerScreenManager.hide(source.getServer());
         source.sendSuccess(() -> Component.literal("PlayerScreenEvent: pantalla desactivada."), false);
+        return 1;
+    }
+
+    private static int showGif(CommandSourceStack source) {
+        if (source.getServer() == null) {
+            return 0;
+        }
+
+        if (!ServerScreenManager.showGif(source.getServer())) {
+            source.sendFailure(Component.literal("No se pudo mostrar el GIF. Revisa la consola y config/playerscreenevent."));
+            return 0;
+        }
+
+        source.sendSuccess(() -> Component.literal("PlayerScreenEvent: segunda pantalla GIF activada."), false);
+        return 1;
+    }
+
+    private static int hideGif(CommandSourceStack source) {
+        if (source.getServer() == null) {
+            return 0;
+        }
+
+        ServerScreenManager.hideGif(source.getServer());
+        source.sendSuccess(() -> Component.literal("PlayerScreenEvent: segunda pantalla GIF desactivada."), false);
+        return 1;
+    }
+
+    private static int hideGifMe(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.literal("Este comando solo puede usarlo un jugador."));
+            return 0;
+        }
+
+        if (!ServerScreenManager.isGifActive()) {
+            source.sendFailure(Component.literal("La segunda pantalla GIF no está activa."));
+            return 0;
+        }
+
+        ServerScreenManager.hideGifForPlayer(player);
+        source.sendSuccess(() -> Component.literal("PlayerScreenEvent: segunda pantalla GIF ocultada para ti."), false);
         return 1;
     }
 }
