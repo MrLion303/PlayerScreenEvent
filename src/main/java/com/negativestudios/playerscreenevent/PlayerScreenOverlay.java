@@ -419,8 +419,16 @@ public final class PlayerScreenOverlay {
         }
 
         @Override
+        public void render(GuiGraphics gui, int mouseX, int mouseY, float partialTick) {
+            // ChatScreen puede preparar/renderizar su propio fondo. Dibujamos primero
+            // la pantalla de espera y después dejamos que el chat se pinte encima.
+            renderWaitingContent(this, gui, mouseX, mouseY, partialTick);
+            super.render(gui, mouseX, mouseY, partialTick);
+        }
+
+        @Override
         public void renderBackground(GuiGraphics gui) {
-            // El chat se muestra encima de la pantalla de espera, sin quitarla.
+            // Evita que el fondo del mundo sustituya la pantalla de espera.
             renderWaitingContent(this, gui, 0, 0, 0.0f);
         }
 
@@ -433,4 +441,5 @@ public final class PlayerScreenOverlay {
             }
         }
     }
+}
 }
