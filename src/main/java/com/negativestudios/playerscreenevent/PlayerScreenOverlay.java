@@ -43,7 +43,7 @@ public final class PlayerScreenOverlay {
     private PlayerScreenOverlay() {}
 
     public static void receive(boolean newActive, String newTitle, int count, int max,
-                               String joined, byte[] imageBytes, boolean chatPermission) {
+                               String joined, byte[] mediaBytes, boolean animated, boolean chatPermission) {
         Minecraft minecraft = Minecraft.getInstance();
 
         title = newTitle;
@@ -52,8 +52,12 @@ public final class PlayerScreenOverlay {
         joinedPlayer = joined == null ? "" : joined;
         canOpenChat = chatPermission;
 
-        if (imageBytes != null && imageBytes.length > 0) {
-            updateTexture(imageBytes);
+        if (mediaBytes != null && mediaBytes.length > 0) {
+            if (animated) {
+                updateGif(mediaBytes);
+            } else {
+                updateTexture(mediaBytes);
+            }
         }
 
         if (newActive) {
@@ -79,12 +83,32 @@ public final class PlayerScreenOverlay {
         }
     }
 
+    private static void updateGif(byte[] bytes) {
+        try {
+            GifAnimation animation = GifAnimation.fromBytes(bytes);
+            if (animation.getFrameCount() == 0) {
+                return;
+            }
+
+            stopGif();
+            releaseTexture();
+            gifAnimation = animation;
+            gifAnimation.start();
+            textureWidth = animation.getWidth();
+            textureHeight = animation.getHeight();
+        } catch (IOException ignored) {
+            // Si el GIF no se puede decodificar, se conserva la anterior.
+        }
+    }
+
     private static void updateTexture(byte[] bytes) {
         try {
             BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
             if (image == null) {
                 return;
             }
+
+            stopGif();
 
             NativeImage nativeImage =
                     new NativeImage(image.getWidth(), image.getHeight(), false);
@@ -171,10 +195,21 @@ public final class PlayerScreenOverlay {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
 
-        if (textureLocation != null && textureWidth > 0 && textureHeight > 0) {
-            RenderSystem.setShaderTexture(0, textureLocation);
-            gui.blit(textureLocation, 0, 0, screen.width, screen.height,
-                    0, 0, textureWidth, textureHeight, textureWidth, textureHeight);
+        ResourceLocation renderTexture = textureLocation;
+        int renderWidth = textureWidth;
+        int renderHeight = textureHeight;
+
+        if (gifAnimation != null) {
+            gifAnimation.renderFrame();
+            renderTexture = gifAnimation.getTextureLocation();
+            renderWidth = gifAnimation.getWidth();
+            renderHeight = gifAnimation.getHeight();
+        }
+
+        if (renderTexture != null && renderWidth > 0 && renderHeight > 0) {
+            RenderSystem.setShaderTexture(0, renderTexture);
+            gui.blit(renderTexture, 0, 0, screen.width, screen.height,
+                    0, 0, renderWidth, renderHeight, renderWidth, renderHeight);
         } else {
             gui.fill(0, 0, screen.width, screen.height, (alphaByte << 24) | 0x00FFFFFF);
         }
