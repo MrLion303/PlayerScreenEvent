@@ -233,19 +233,22 @@ public final class PlayerScreenOverlay {
             gui.fill(0, 0, screen.width, screen.height, (alphaByte << 24) | 0x00FFFFFF);
         }
 
-        int titleY = (int) (screen.height * 0.47f);
-        int countY = (int) (screen.height * 0.565f);
-        int joinedY = (int) (screen.height * 0.625f);
+        // La pantalla GIF es exclusivamente visual: no muestra texto encima.
+        if (gifAnimation == null) {
+            int titleY = (int) (screen.height * 0.47f);
+            int countY = (int) (screen.height * 0.565f);
+            int joinedY = (int) (screen.height * 0.625f);
 
-        float responsiveScale = getResponsiveScale();
+            float responsiveScale = getResponsiveScale();
 
-        drawCentered(screen, gui, title, titleY, 4.0f * responsiveScale, alphaByte, 0xFFFFFFFF);
-        drawCentered(screen, gui, playerCount + "/" + maxPlayers, countY,
-                1.75f * responsiveScale, alphaByte, 0xFFFFFFFF);
+            drawCentered(screen, gui, title, titleY, 4.0f * responsiveScale, alphaByte, 0xFFFFFFFF);
+            drawCentered(screen, gui, playerCount + "/" + maxPlayers, countY,
+                    1.75f * responsiveScale, alphaByte, 0xFFFFFFFF);
 
-        if (!joinedPlayer.isEmpty()) {
-            drawCentered(screen, gui, joinedPlayer + " se ha unido.", joinedY,
-                    1.5f * responsiveScale, alphaByte, 0xFFFF5555);
+            if (!joinedPlayer.isEmpty()) {
+                drawCentered(screen, gui, joinedPlayer + " se ha unido.", joinedY,
+                        1.5f * responsiveScale, alphaByte, 0xFFFF5555);
+            }
         }
 
         RenderSystem.disableBlend();
