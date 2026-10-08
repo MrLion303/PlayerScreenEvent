@@ -8,17 +8,17 @@ import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.loading.FMLPaths;
+import org.slf4j.Logger;
 
 import javax.imageio.ImageIO;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.io.Reader;
 import java.io.Writer;
-import org.slf4j.Logger;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public final class PlayerScreenConfig {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -28,6 +28,7 @@ public final class PlayerScreenConfig {
     public static ForgeConfigSpec.ConfigValue<String> TITLE;
     public static ForgeConfigSpec.IntValue MAX_PLAYERS;
     public static ForgeConfigSpec.ConfigValue<String> IMAGE_PATH;
+    public static ForgeConfigSpec.ConfigValue<String> GIF_PATH;
 
     private PlayerScreenConfig() {}
 
@@ -36,7 +37,6 @@ public final class PlayerScreenConfig {
         JsonObject json = loadJsonConfig();
 
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
-
         builder.push("pantalla");
 
         TITLE = builder
@@ -45,11 +45,17 @@ public final class PlayerScreenConfig {
 
         MAX_PLAYERS = builder
                 .comment("Cantidad maxima mostrada. Usa -1 para usar el maximo real del servidor.")
-                .defineInRange("jugadores_maximos", json.has("jugadores_maximos") ? json.get("jugadores_maximos").getAsInt() : -1, -1, 1000000);
+                .defineInRange("jugadores_maximos",
+                        json.has("jugadores_maximos") ? json.get("jugadores_maximos").getAsInt() : -1,
+                        -1, 1000000);
 
         IMAGE_PATH = builder
-                .comment("Nombre del archivo de imagen dentro de config/playerscreenevent/. No escribas la ruta.")
+                .comment("Nombre del archivo de la pantalla principal. Puede ser PNG, JPG o GIF.")
                 .define("imagen", json.has("imagen") ? json.get("imagen").getAsString() : "screen.png");
+
+        GIF_PATH = builder
+                .comment("Nombre del GIF de la segunda pantalla.")
+                .define("gif", json.has("gif") ? json.get("gif").getAsString() : "screen.gif");
 
         builder.pop();
 
@@ -62,16 +68,19 @@ public final class PlayerScreenConfig {
     }
 
     public static Path getImagePath() {
-        String filename = IMAGE_PATH.get().trim();
+        return resolveFilename(IMAGE_PATH.get(), "screen.png");
+    }
 
-        if (filename.isEmpty()) {
-            filename = "screen.png";
-        }
+    public static Path getGifPath() {
+        return resolveFilename(GIF_PATH.get(), "screen.gif");
+    }
 
-        // El campo de configuracion acepta solamente el nombre del archivo.
-        // Evita que una configuracion accidental salga de la carpeta del mod.
-        if (filename.contains("/") || filename.contains("\\") || filename.equals(".") || filename.equals("..")) {
-            filename = "screen.png";
+    private static Path resolveFilename(String configured, String fallback) {
+        String filename = configured == null ? "" : configured.trim();
+
+        if (filename.isEmpty() || filename.contains("/") || filename.contains("\") ||
+                filename.equals(".") || filename.equals("..")) {
+            filename = fallback;
         }
 
         return getImageDirectory().resolve(filename).normalize();
@@ -83,6 +92,7 @@ public final class PlayerScreenConfig {
         try {
             Files.createDirectories(directory);
             createDefaultImage(directory.resolve("screen.png"));
+            createDefaultGif(directory.resolve("screen.gif"));
             createDefaultJson(directory.resolve("config.json"));
         } catch (IOException exception) {
             LOGGER.error("No se pudo crear la carpeta de configuracion de PlayerScreenEvent.", exception);
@@ -91,7 +101,11 @@ public final class PlayerScreenConfig {
 
     private static JsonObject loadJsonConfig() {
         Path path = getImageDirectory().resolve("config.json");
-        if (!Files.exists(path)) return new JsonObject();
+
+        if (!Files.exists(path)) {
+            return new JsonObject();
+        }
+
         try (Reader reader = Files.newBufferedReader(path)) {
             JsonObject object = GSON.fromJson(reader, JsonObject.class);
             return object == null ? new JsonObject() : object;
@@ -102,15 +116,21 @@ public final class PlayerScreenConfig {
     }
 
     private static void createDefaultJson(Path path) throws IOException {
-        if (Files.exists(path)) return;
+        if (Files.exists(path)) {
+            return;
+        }
+
         JsonObject object = new JsonObject();
         object.addProperty("texto", "Esperando jugadores...");
         object.addProperty("jugadores_maximos", -1);
         object.addProperty("imagen", "screen.png");
+        object.addProperty("gif", "screen.gif");
+
         try (Writer writer = Files.newBufferedWriter(path)) {
             GSON.toJson(object, writer);
         }
     }
+
     private static void createDefaultImage(Path path) throws IOException {
         if (Files.exists(path)) {
             return;
@@ -122,16 +142,23 @@ public final class PlayerScreenConfig {
         try {
             graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             graphics.fillRect(0, 0, 1280, 720);
-
             graphics.setFont(graphics.getFont().deriveFont(42.0f));
+
             String text = "Esperando jugadores...";
             int textWidth = graphics.getFontMetrics().stringWidth(text);
-
             graphics.drawString(text, (1280 - textWidth) / 2, 360);
         } finally {
             graphics.dispose();
         }
 
         ImageIO.write(image, "png", path.toFile());
+    }
+
+    private static void createDefaultGif(Path path) throws IOException {
+        if (Files.exists(path)) {
+            return;
+        }
+
+        createDefaultImage(path);
     }
 }
