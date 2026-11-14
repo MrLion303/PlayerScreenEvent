@@ -1,6 +1,7 @@
 package com.negativestudios.playerscreenevent;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.logging.LogUtils;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -16,6 +17,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.common.Mod;
 import org.lwjgl.glfw.GLFW;
+import org.slf4j.Logger;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -24,7 +26,10 @@ import java.io.IOException;
 
 @Mod.EventBusSubscriber(modid = PlayerScreenEvent.MOD_ID, value = Dist.CLIENT)
 public final class PlayerScreenOverlay {
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final long FADE_MS = 500L;
+    private static final int MAX_MEDIA_BYTES = 1_900_000;
+    private static final int MEDIA_CHUNK_SIZE = ScreenMediaChunkPacket.CHUNK_SIZE;
 
     private static boolean active;
     private static boolean fading;
@@ -40,12 +45,104 @@ public final class PlayerScreenOverlay {
     private static ResourceLocation textureLocation;
     private static int textureWidth;
     private static int textureHeight;
+    private static PendingMediaTransfer pendingMediaTransfer;
+
+    private static final class PendingMediaTransfer {
+        private final boolean active;
+        private final String title;
+        private final int playerCount;
+        private final int maxPlayers;
+        private final String joinedPlayer;
+        private final boolean animated;
+        private final boolean canOpenChat;
+        private final long transferId;
+        private final byte[] media;
+        private final boolean[] received;
+        private int receivedCount;
+
+        private PendingMediaTransfer(boolean active, String title, int playerCount, int maxPlayers,
+                                     String joinedPlayer, boolean animated, boolean canOpenChat,
+                                     long transferId, int mediaLength, int chunkCount) {
+            this.active = active;
+            this.title = title;
+            this.playerCount = playerCount;
+            this.maxPlayers = maxPlayers;
+            this.joinedPlayer = joinedPlayer;
+            this.animated = animated;
+            this.canOpenChat = canOpenChat;
+            this.transferId = transferId;
+            this.media = new byte[mediaLength];
+            this.received = new boolean[chunkCount];
+        }
+    }
 
     private PlayerScreenOverlay() {}
+
+    public static void beginMediaTransfer(boolean newActive, String newTitle, int count, int max,
+                                          String joined, boolean animated, boolean chatPermission,
+                                          long transferId, int mediaLength, int chunkCount) {
+        int expectedChunks = mediaLength <= 0 ? 0
+                : (mediaLength + MEDIA_CHUNK_SIZE - 1) / MEDIA_CHUNK_SIZE;
+
+        if (transferId <= 0L || mediaLength <= 0 || mediaLength > MAX_MEDIA_BYTES
+                || chunkCount != expectedChunks || chunkCount <= 0) {
+            pendingMediaTransfer = null;
+            LOGGER.error("PlayerScreenEvent recibio una transferencia multimedia con metadatos invalidos.");
+            return;
+        }
+
+        pendingMediaTransfer = new PendingMediaTransfer(
+                newActive, newTitle, count, max, joined == null ? "" : joined,
+                animated, chatPermission, transferId, mediaLength, chunkCount
+        );
+    }
+
+    public static void receiveMediaChunk(long transferId, int chunkIndex, int totalChunks, byte[] data) {
+        PendingMediaTransfer transfer = pendingMediaTransfer;
+        if (transfer == null || transfer.transferId != transferId) {
+            return;
+        }
+
+        if (totalChunks != transfer.received.length || chunkIndex < 0
+                || chunkIndex >= transfer.received.length || data == null) {
+            LOGGER.warn("PlayerScreenEvent descarto un fragmento multimedia inesperado.");
+            pendingMediaTransfer = null;
+            return;
+        }
+
+        int offset = chunkIndex * MEDIA_CHUNK_SIZE;
+        int expectedLength = Math.min(MEDIA_CHUNK_SIZE, transfer.media.length - offset);
+        if (expectedLength <= 0 || data.length != expectedLength) {
+            LOGGER.error("PlayerScreenEvent recibio un fragmento multimedia incompleto o con tamano incorrecto.");
+            pendingMediaTransfer = null;
+            return;
+        }
+
+        if (!transfer.received[chunkIndex]) {
+            System.arraycopy(data, 0, transfer.media, offset, data.length);
+            transfer.received[chunkIndex] = true;
+            transfer.receivedCount++;
+        }
+
+        if (transfer.receivedCount == transfer.received.length) {
+            pendingMediaTransfer = null;
+            receive(
+                    transfer.active,
+                    transfer.title,
+                    transfer.playerCount,
+                    transfer.maxPlayers,
+                    transfer.joinedPlayer,
+                    transfer.media,
+                    transfer.animated,
+                    transfer.canOpenChat
+            );
+        }
+    }
 
     public static void receive(boolean newActive, String newTitle, int count, int max,
                                String joined, byte[] mediaBytes, boolean animated, boolean chatPermission) {
         Minecraft minecraft = Minecraft.getInstance();
+        pendingMediaTransfer = null;
 
         title = newTitle;
         playerCount = count;
@@ -95,8 +192,9 @@ public final class PlayerScreenOverlay {
         if (textureLocation != null) {
             Minecraft.getInstance().getTextureManager().release(textureLocation);
             textureLocation = null;
-        }
-        if (dynamicTexture != null) {
+            // TextureManager libera la DynamicTexture registrada.
+            dynamicTexture = null;
+        } else if (dynamicTexture != null) {
             dynamicTexture.close();
             dynamicTexture = null;
         }
@@ -115,8 +213,8 @@ public final class PlayerScreenOverlay {
             gifAnimation.start();
             textureWidth = animation.getWidth();
             textureHeight = animation.getHeight();
-        } catch (IOException ignored) {
-            // Si el GIF no se puede decodificar, se conserva la anterior.
+        } catch (IOException | RuntimeException exception) {
+            LOGGER.error("PlayerScreenEvent no pudo decodificar el GIF recibido desde el servidor.", exception);
         }
     }
 
@@ -124,10 +222,9 @@ public final class PlayerScreenOverlay {
         try {
             BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
             if (image == null) {
+                LOGGER.error("PlayerScreenEvent recibio datos que no corresponden a una imagen compatible.");
                 return;
             }
-
-            stopGif();
 
             NativeImage nativeImage =
                     new NativeImage(image.getWidth(), image.getHeight(), false);
@@ -143,24 +240,18 @@ public final class PlayerScreenOverlay {
                 }
             }
 
-            if (dynamicTexture != null) {
-                dynamicTexture.close();
-            }
+            stopGif();
+            releaseTexture();
 
             dynamicTexture = new DynamicTexture(nativeImage);
             dynamicTexture.upload();
-
-            if (textureLocation != null) {
-                Minecraft.getInstance().getTextureManager().release(textureLocation);
-            }
-
             textureLocation = Minecraft.getInstance().getTextureManager().register(
                     "playerscreenevent/screen_" + System.nanoTime(), dynamicTexture
             );
             textureWidth = image.getWidth();
             textureHeight = image.getHeight();
-        } catch (IOException ignored) {
-            // Si una imagen no se puede decodificar, se conserva la anterior.
+        } catch (IOException | RuntimeException exception) {
+            LOGGER.error("PlayerScreenEvent no pudo decodificar o registrar la imagen recibida desde el servidor.", exception);
         }
     }
 

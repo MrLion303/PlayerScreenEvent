@@ -5,7 +5,7 @@ import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class NetworkHandler {
-    private static final String PROTOCOL = "1";
+    private static final String PROTOCOL = "2";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(PlayerScreenEvent.MOD_ID, "main"),
             () -> PROTOCOL,
@@ -24,6 +24,13 @@ public final class NetworkHandler {
                 ScreenUpdatePacket::encode,
                 ScreenUpdatePacket::decode,
                 ScreenUpdatePacket::handle
+        );
+        CHANNEL.registerMessage(
+                packetId++,
+                ScreenMediaChunkPacket.class,
+                ScreenMediaChunkPacket::encode,
+                ScreenMediaChunkPacket::decode,
+                ScreenMediaChunkPacket::handle
         );
     }
 }

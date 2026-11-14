@@ -293,9 +293,9 @@ public final class GifAnimation {
         if (textureLocation != null) {
             Minecraft.getInstance().getTextureManager().release(textureLocation);
             textureLocation = null;
-        }
-
-        if (dynamicTexture != null) {
+            // TextureManager libera la DynamicTexture registrada.
+            dynamicTexture = null;
+        } else if (dynamicTexture != null) {
             dynamicTexture.close();
             dynamicTexture = null;
         }

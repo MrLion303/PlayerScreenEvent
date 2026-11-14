@@ -66,7 +66,17 @@ Ejemplo:
 
 El archivo debe estar dentro de `config/playerscreenevent/`.
 
-Los archivos multimedia enviados a los clientes tienen un límite de aproximadamente 1.9 MB para mantener el paquete de red dentro del tamaño previsto por el mod.
+Los archivos multimedia enviados a los clientes tienen un límite de 1.9 MB. El mod los divide automáticamente en fragmentos pequeños para respetar el límite de los paquetes personalizados de Minecraft 1.20.1 y reconstruye el archivo en el cliente antes de mostrarlo.
+
+### Servidor dedicado
+
+La configuración y los archivos multimedia se leen **desde el servidor**. En singleplayer, el cliente y el servidor integrado comparten la misma carpeta, pero en un servidor dedicado debes colocar tus archivos en la carpeta del propio servidor:
+
+`<carpeta-del-servidor>/config/playerscreenevent/`
+
+Copia allí `screen.png`, `screen.gif` y cualquier archivo personalizado que indiques en `config.json`. No basta con tenerlos en la carpeta `config` de tu Minecraft local. El servidor envía el recurso a cada jugador cuando activa la pantalla o cuando ese jugador entra.
+
+El mod debe estar instalado tanto en el servidor Forge como en los clientes, usando la misma versión. La consola del servidor mostrará la ruta exacta y el tamaño del archivo que se cargó al ejecutar cada comando.
 
 ## Comportamiento
 

@@ -20,9 +20,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 public final class ServerScreenManager {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -53,10 +55,14 @@ public final class ServerScreenManager {
     }
 
     public static boolean show(MinecraftServer server) {
+        Path imagePath = PlayerScreenConfig.getImagePath();
         try {
-            mainMedia = loadMedia(PlayerScreenConfig.getImagePath());
+            mainMedia = loadMedia(imagePath);
+            LOGGER.info("PlayerScreenEvent: pantalla principal cargada desde {} ({} bytes).",
+                    imagePath.toAbsolutePath(), mainMedia.length);
         } catch (IOException e) {
-            LOGGER.error("No se pudo cargar la pantalla principal: {}", e.getMessage());
+            LOGGER.error("No se pudo cargar la pantalla principal desde {}.",
+                    imagePath.toAbsolutePath(), e);
             return false;
         }
 
@@ -79,10 +85,14 @@ public final class ServerScreenManager {
     }
 
     public static boolean showGif(MinecraftServer server) {
+        Path gifPath = PlayerScreenConfig.getGifPath();
         try {
-            gifMedia = loadGif(PlayerScreenConfig.getGifPath());
+            gifMedia = loadGif(gifPath);
+            LOGGER.info("PlayerScreenEvent: GIF cargado desde {} ({} bytes).",
+                    gifPath.toAbsolutePath(), gifMedia.length);
         } catch (IOException e) {
-            LOGGER.error("No se pudo cargar el GIF de PlayerScreenEvent: {}", e.getMessage());
+            LOGGER.error("No se pudo cargar el GIF de PlayerScreenEvent desde {}.",
+                    gifPath.toAbsolutePath(), e);
             return false;
         }
 
@@ -212,19 +222,50 @@ public final class ServerScreenManager {
             return;
         }
 
+        if (media != null && (media.length == 0 || media.length > MAX_MEDIA_BYTES)) {
+            LOGGER.error("PlayerScreenEvent no envio un recurso multimedia con tamano invalido: {} bytes.",
+                    media.length);
+            media = null;
+        }
+
+        int chunkCount = media == null ? 0
+                : (media.length + ScreenMediaChunkPacket.CHUNK_SIZE - 1)
+                / ScreenMediaChunkPacket.CHUNK_SIZE;
+        long transferId = chunkCount == 0
+                ? 0L
+                : ThreadLocalRandom.current().nextLong(1L, Long.MAX_VALUE);
+
+        var target = PacketDistributor.PLAYER.with(() -> player);
         NetworkHandler.CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
+                target,
                 new ScreenUpdatePacket(
                         active,
                         PlayerScreenConfig.TITLE.get(),
                         server.getPlayerList().getPlayerCount(),
                         getMaxPlayers(server),
                         joinedPlayer,
-                        media,
                         animated,
-                        player.hasPermissions(2)
+                        player.hasPermissions(2),
+                        transferId,
+                        media == null ? 0 : media.length,
+                        chunkCount
                 )
         );
+
+        if (media == null) {
+            return;
+        }
+
+        for (int index = 0; index < chunkCount; index++) {
+            int start = index * ScreenMediaChunkPacket.CHUNK_SIZE;
+            int end = Math.min(media.length, start + ScreenMediaChunkPacket.CHUNK_SIZE);
+            byte[] chunk = Arrays.copyOfRange(media, start, end);
+
+            NetworkHandler.CHANNEL.send(
+                    target,
+                    new ScreenMediaChunkPacket(transferId, index, chunkCount, chunk)
+            );
+        }
     }
 
     private static byte[] loadGif(Path path) throws IOException {
