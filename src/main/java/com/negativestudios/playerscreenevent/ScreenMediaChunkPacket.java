@@ -48,7 +48,7 @@ public final class ScreenMediaChunkPacket {
     public static void handle(ScreenMediaChunkPacket packet, Supplier<NetworkEvent.Context> supplier) {
         NetworkEvent.Context context = supplier.get();
 
-        context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () ->
+        context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
                 PlayerScreenOverlay.receiveMediaChunk(
                         packet.transferId,
                         packet.chunkIndex,
