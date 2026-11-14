@@ -1,6 +1,5 @@
 package com.negativestudios.playerscreenevent;
 
-import net.minecraft.network.DecoderException;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;
@@ -77,7 +76,7 @@ public final class ScreenUpdatePacket {
 
             if (transferId <= 0L || mediaLength <= 0 || mediaLength > MAX_MEDIA_BYTES
                     || chunkCount != expectedChunks) {
-                throw new DecoderException("Transferencia multimedia de PlayerScreenEvent no valida.");
+                throw new IllegalArgumentException("Transferencia multimedia de PlayerScreenEvent no valida.");
             }
         }
 
