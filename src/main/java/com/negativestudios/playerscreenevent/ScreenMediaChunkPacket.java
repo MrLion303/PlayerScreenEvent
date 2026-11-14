@@ -1,6 +1,5 @@
 package com.negativestudios.playerscreenevent;
 
-import net.minecraft.network.DecoderException;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;
@@ -39,7 +38,7 @@ public final class ScreenMediaChunkPacket {
 
         if (transferId <= 0L || totalChunks <= 0 || chunkIndex < 0
                 || chunkIndex >= totalChunks || data.length == 0) {
-            throw new DecoderException("Fragmento multimedia de PlayerScreenEvent no valido.");
+            throw new IllegalArgumentException("Fragmento multimedia de PlayerScreenEvent no valido.");
         }
 
         return new ScreenMediaChunkPacket(transferId, chunkIndex, totalChunks, data);
